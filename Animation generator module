@@ -1,0 +1,285 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
+
+entity anim_generator is
+     Port ( clk            : in  STD_LOGIC;
+                reset      : in std_logic;
+                resetfunc  : inout std_logic;
+                x_sayac    : in  STD_LOGIC_VECTOR(9 downto 0);
+                faster     : in std_logic;
+                start_ball : in std_logic;
+                top_button_l   :in STD_LOGIC;
+                top_button_r   :in STD_LOGIC;
+                bottom_button_l   :in STD_LOGIC;
+                bottom_button_r   :in STD_LOGIC;
+                y_sayac    : in STD_LOGIC_VECTOR(9 downto 0);
+                video_on   : in  STD_LOGIC;
+                rgb        : out  STD_LOGIC_VECTOR(2 downto 0);
+                score1     : out std_logic;
+                score2     : out std_logic);
+    end anim_generator;
+
+architecture Behavioral of anim_generator is
+
+signal scoreChecker1: std_logic;
+signal scoreChecker2: std_logic;
+--signal scorer, scorerNext: std_logic;
+--top bar (p2)
+signal topbar_l,topbar_l_next:integer :=460; --bar left distance
+constant topbar_t:integer := 40;--bar top distance
+constant topbar_k:integer :=10;--bar thickness
+constant topbar_w:integer:= 120;--bar width
+constant topbar_h:integer:=10;--bar velocity
+signal topbar_on:std_logic;
+signal rgb_topbar:std_logic_vector(2 downto 0);
+
+--bottom bar (p1)
+signal bottombar_l,bottombar_l_next:integer :=460; --bar left distance
+constant bottombar_t:integer := 560;--bar top distance
+constant bottombar_k:integer :=10;--bar thickness
+constant bottombar_w:integer:= 120;--bar width
+constant bottombar_h:integer:=10;--bar velocity
+signal bottombar_on:std_logic;
+signal rgb_bottombar:std_logic_vector(2 downto 0);
+
+--ball
+signal ball_l,ball_l_next:integer :=100;--ball left distance
+signal ball_t,ball_t_next:integer :=100; --ball top distance
+constant ball_default_l: integer := 300;
+constant ball_default_t: integer := 300;
+constant ball_r:integer :=8;--ball radius
+constant ball_w:integer :=20;--ball width
+constant ball_u:integer :=20;--ball lenght
+constant x_v,y_v:integer:=3;-- ball horizontal vertical velocity
+constant x_v2, y_v2 : integer := 6;
+signal top_on:std_logic;
+signal rgb_top:std_logic_vector(2 downto 0); 
+
+--refresh(1/72)
+signal refresh_reg,refresh_next:integer;
+constant refresh_constant:integer:= 1388888;
+signal refresh_tick:std_logic;
+
+--ball animation
+signal xv_reg,xv_next:integer;--horizontal velocity variable
+signal yv_reg,yv_next:integer;--vertical velocity variable
+
+--x,y pixel pointer
+signal x,y: integer;
+
+--mux
+signal vbtt:std_logic_vector(3 downto 0);
+
+--buffer
+signal rgb_reg,rgb_next:std_logic_vector(2 downto 0);
+
+begin
+
+--x,y pixel pointer
+x <=conv_integer(x_sayac);
+y <=conv_integer(y_sayac);
+
+--refresh time
+process(clk)
+    begin
+        if clk'event and clk='1' then
+             refresh_reg<=refresh_next;      
+        end if;
+    end process;
+
+refresh_next<= 0    when refresh_reg= refresh_constant else
+                           refresh_reg+1;
+refresh_tick<= '1' when refresh_reg = 0 else
+                           '0';
+                         
+
+process(clk)
+    begin
+        if clk'event and clk='1' then
+                ball_l <= ball_default_l;   
+                ball_t <= ball_default_t;   
+                bottombar_l <= 460;   
+                topbar_l <= 460;   
+                xv_reg <= 0;   
+                yv_reg <= 0;   
+            if (reset = '1' or resetfunc = '1') then --to reset the game
+                ball_l <= ball_default_l;   
+                ball_t <= ball_default_t;   
+                bottombar_l <= 460;   
+                topbar_l <= 460;   
+                xv_reg <= 0;   
+                yv_reg <= 0;   
+            else
+                ball_l <= ball_default_l;   
+                ball_t <= ball_default_t;   
+                bottombar_l <= 460;   
+                topbar_l <= 460; 
+                xv_reg <= xv_next;
+                yv_reg <= yv_next;
+                if start_ball = '1' then
+                    if faster = '0' then
+                        xv_reg <= 3;
+                        yv_reg <= 3;
+                    else
+                        xv_reg <= 6;
+                        yv_reg <= 6;
+                    end if;
+                end if;   
+                ball_l<=ball_l_next;
+                ball_t<=ball_t_next;
+                topbar_l<=topbar_l_next;
+                bottombar_l<=bottombar_l_next;
+             
+            end if;       -- end reset's if
+                  
+
+
+    end if;
+end process;
+
+
+--top bar animation
+process(topbar_l,refresh_tick,top_button_r,top_button_l)
+    begin
+        topbar_l_next<=topbar_l;
+         if refresh_tick= '1' then
+             if top_button_l='1' and topbar_l > topbar_h then -- left button pressed and top bar can move to the left
+                   topbar_l_next<=topbar_l - topbar_h;
+             elsif top_button_r='1' and topbar_l < (799- topbar_h-topbar_w) then -- right button pressed and bar can move to thw right
+                   topbar_l_next<=topbar_l+ topbar_h;
+             else 
+                topbar_l_next <= topbar_l;
+             end if;
+         end if;
+end process;
+
+--bottom bar animation
+process(bottombar_l,refresh_tick,bottom_button_r,bottom_button_l)
+    begin
+         bottombar_l_next<=bottombar_l;
+         if refresh_tick= '1' then
+             if bottom_button_l='1' and bottombar_l > bottombar_h then
+                   bottombar_l_next<=bottombar_l- bottombar_h;
+             elsif bottom_button_r='1' and bottombar_l < (799- bottombar_h-bottombar_w) then -- right pressed 
+                   bottombar_l_next<=bottombar_l+ bottombar_h; --move bottombar to the right
+             else
+                   bottombar_l_next <= bottombar_l;
+             end if;
+         end if;
+end process;
+
+--top animation
+process(refresh_tick,ball_l,ball_t,xv_reg,yv_reg)
+    begin
+         ball_l_next <=ball_l;
+         ball_t_next <=ball_t;
+--         scorerNext <= scorer;
+         xv_next<=xv_reg;
+         yv_next<=yv_reg;
+         scoreChecker1 <= '0'; --1st player did not scored, default value
+         scoreChecker2 <= '0';
+         if refresh_tick = '1' then
+                if ball_l >= bottombar_l and ball_l <= bottombar_l + 120 and ball_t >= bottombar_t - 10  then -- ball hits bottombar
+                      if faster = '0' then
+                      yv_next <= -y_v ;
+                      else
+                       yv_next <= -y_v2 ;
+                      end if;
+                elsif ball_l >= topbar_l and ball_l <= topbar_l + 120 and  ball_t <= topbar_t + 20 then -- ball hits topbar 
+                      if faster = '0' then
+                      yv_next <= y_v;
+                      else
+                      yv_next <= y_v2;
+                      end if;
+                end if;
+                if ball_l < 10 then --ball hits the left
+                       if faster = '0' then
+                       xv_next<= x_v;
+                       else
+                       xv_next<= x_v2;
+                       end if;
+                elsif ball_l> 790 then    
+                       if faster = '0' then          
+                       xv_next<= -x_v ;         --ball hits the right
+                       else
+                       xv_next<= -x_v2 ; 
+                       end if;
+                end if;
+                ball_l_next <= ball_l + xv_reg; -- move the ball's horizontal location
+                ball_t_next <=ball_t + yv_reg;  -- move the ball's vertical location
+          if ball_t < 40 then -- if the ball passes the top bar (p1 scores)
+                ball_l_next <= ball_default_l; -- reset the ball's location to its default
+                ball_t_next <= ball_default_t; -- default vertical position
+                if faster = '0' then 
+                xv_next <= 3; -- DONTstop the ball
+                yv_next <= -3; -- DONTstop the ball
+                else
+                 xv_next <= 6; -- stop the ball
+                yv_next <= -6;
+                end if;
+--                scorerNext <= '0';
+                scoreChecker1 <= '1'; -- 1sr player scored (bottom one)
+          else 
+                scoreChecker1 <= '0';
+          end if;
+          
+          if ball_t > 570 then -- if the ball passes the bottom bar (p2 scores)
+                ball_l_next <= ball_default_l; -- reset the ball's location to its default
+                ball_t_next <= ball_default_t; -- default vertical position
+                if faster = '0' then 
+                xv_next <= 3; -- DONTstop the ball
+                yv_next <= 3; -- DONTstop the ball
+                else
+                xv_next <= 6; -- DONTstop the ball
+                yv_next <= 6;
+                end if;
+--                scorerNext <= '1';
+                scoreChecker2 <= '1'; -- 2nd player scored (top one)
+          else 
+                scoreChecker2 <= '0';
+          end if;
+     end if;
+end process;
+
+-- display bottombar object on the screen
+
+bottombar_on <= '1' when x > bottombar_l and x < (bottombar_l + bottombar_w) and y > bottombar_t and y < (bottombar_t + bottombar_k) else
+                '0';
+rgb_bottombar <= "100";   -- red             
+
+-- display topbar object on the screen
+topbar_on <= '1' when x > topbar_l and x < (topbar_l + topbar_w) and y > topbar_t and y < (topbar_t+ topbar_k) else
+                    '0';
+rgb_topbar<="010"; -- green
+
+-- display ball object on the screen
+top_on <= '1' when (x - ball_l) * (x - ball_l) + (y - ball_t) * (y - ball_t) <= ball_r * ball_r else
+           '0'; 
+rgb_top <= "111"; -- white(111) x red(100)
+
+--buffer
+process(clk)
+     begin
+         if clk'event and clk='1' then
+              rgb_reg<=rgb_next;
+         end if;
+     end process;
+
+--mux
+vbtt<=video_on & bottombar_on & topbar_on & top_on;     
+with vbtt select
+     rgb_next <= "000"  when "1000",-- backscreen color, cyan(011), black(000)
+     rgb_bottombar      when "1100",
+     rgb_bottombar      when "1101",
+     rgb_topbar         when "1010",
+     rgb_topbar         when "1011",
+     rgb_top            when "1001",
+     "000"              when others;
+--output
+rgb<=rgb_reg;
+score1 <= scoreChecker1;
+score2 <= scoreChecker2;
+
+end Behavioral;
