@@ -1,0 +1,45 @@
+-- I could not implement my joysticks by their analog signals, so I used a diagonal holding method to take left and right movements from the joysticks. By this code, you should
+-- hold the joysticks diagonally to make right and left movements.
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;    
+use IEEE.STD_LOGIC_UNSIGNED.ALL; 
+
+entity joystick is
+  Port ( clk : in std_logic;
+         jsinput1 : in std_logic_vector(1 downto 0);
+         jsinput2 : in std_logic_vector(1 downto 0);
+         topbar_left : out std_logic;
+         topbar_right : out std_logic;
+         bottombar_left : out std_logic;
+         bottombar_right : out std_logic);
+end joystick;
+
+architecture Behavioral of joystick is
+
+begin
+
+process(clk)
+begin
+-- JA : jsinput1 : right js : for topbar
+    if jsinput2 = "01" then
+        topbar_right <= '1';
+    elsif jsinput2 = "10" then
+        topbar_left <= '1';
+    else
+        topbar_right <= '0';
+        topbar_left <= '0';
+    end if;
+-- JB : jsinput2 : left js : for bottombar   
+    if jsinput1 = "01" then
+        bottombar_right <= '1';
+    elsif jsinput1 = "10" then
+        bottombar_left <= '1';
+    else --11
+        bottombar_right <= '0';
+        bottombar_left <= '0';
+    end if;
+    
+end process;
+
+end Behavioral;
