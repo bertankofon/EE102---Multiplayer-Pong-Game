@@ -1,0 +1,161 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
+
+entity top_module is
+    Port ( clk            : in  STD_LOGIC;
+               basla       : in  STD_LOGIC;
+               reset        : in  STD_LOGIC;
+               start_ball   : in std_logic;
+               faster       : in std_logic;
+               jsinput1     : in std_logic_vector(1 downto 0);
+               jsinput2     : in std_logic_vector(1 downto 0);
+               bottom_button_l   : IN std_logic;
+               bottom_button_r   : IN std_logic;
+               top_button_l   : IN std_logic;
+               top_button_r   : IN std_logic;
+               rgb            : out  STD_LOGIC_VECTOR (2 downto 0);
+               h_s           : out  STD_LOGIC;
+               v_s            : out  STD_LOGIC;
+               a, b, c, d, e, f, g, dp  : out std_logic;
+               an : out std_logic_vector(3 downto 0));
+     end top_module;
+
+architecture Behavioral of top_module is
+
+COMPONENT anim_generator
+   Port (       clk            : in  STD_LOGIC;
+                reset      : in std_logic;
+                resetfunc  : inout std_logic;
+                x_sayac    : in  STD_LOGIC_VECTOR(9 downto 0);
+                faster     : in std_logic;
+                start_ball : in std_logic;
+                top_button_l   :in STD_LOGIC;
+                top_button_r   :in STD_LOGIC;
+                bottom_button_l   :in STD_LOGIC;
+                bottom_button_r   :in STD_LOGIC;
+                y_sayac    : in STD_LOGIC_VECTOR(9 downto 0);
+                video_on   : in  STD_LOGIC;
+                rgb        : out  STD_LOGIC_VECTOR(2 downto 0);
+                score1     : out std_logic;
+                score2     : out std_logic);
+  END COMPONENT;
+  
+Component joystick
+  Port ( clk : in std_logic;
+         jsinput1 : in std_logic_vector(1 downto 0);
+         jsinput2 : in std_logic_vector(1 downto 0);
+         topbar_left : out std_logic;
+         topbar_right : out std_logic;
+         bottombar_left : out std_logic;
+         bottombar_right : out std_logic);
+end component;
+
+
+Component sevensegment
+Port (     clk  : in  STD_LOGIC;
+           in0, in1, in2, in3 : in std_logic_vector(3 downto 0);
+           a, b, c, d, e, f, g, dp  : out std_logic;
+           an : out std_logic_vector(3 downto 0));
+end component;
+
+
+Component clockdivider 
+port (      clk   : in std_logic;
+            reset : in std_logic;
+            clock_out: out std_logic);
+end component;
+
+
+COMPONENT sync_mod
+PORT(        clk            : IN std_logic;
+             basla       : IN std_logic;         
+             y_sayac   : OUT std_logic_vector(9 downto 0);
+             x_sayac   : OUT std_logic_vector(9 downto 0);
+             h_s           : OUT std_logic;
+             v_s            : OUT std_logic;
+             video_on   : OUT std_logic );
+END COMPONENT;
+
+signal rst : std_logic;
+signal dividedclock : std_logic;
+signal score_checker1 : std_logic := '0';
+signal score_checker2 : std_logic := '0';
+signal player1_score : std_logic_vector(3 downto 0) := "0000";
+signal player2_score : std_logic_vector(3 downto 0) := "0000";
+signal movetopleft : std_logic;
+signal movetopright : std_logic;
+signal movebottomleft : std_logic;
+signal movebottomright: std_logic;
+signal resetfunc: std_logic := '0';
+signal letterp : std_logic_vector(3 downto 0) := "0000";
+signal winner : std_logic_vector(3 downto 0) := "0000";
+
+signal x,y:std_logic_vector(9 downto 0);
+signal video:std_logic;
+
+
+begin
+
+anim_gen : anim_generator port map(clk => clk, reset => reset, resetfunc => resetfunc, x_sayac => x, faster => faster, start_ball => start_ball,
+                              top_button_l=>movetopleft, top_button_r =>movetopright, 
+                              bottom_button_l => movebottomleft, bottom_button_r => movebottomright,
+                              y_sayac => y, video_on => video, rgb => rgb, score1 => score_checker1, score2 => score_checker2);
+                              
+ 
+jscontrol : joystick port map (clk => clk, jsinput1 => jsinput1, jsinput2 => jsinput2, topbar_left => movetopleft, 
+                               topbar_right => movetopright, bottombar_left => movebottomleft, bottombar_right => movebottomright);
+                                 
+
+
+sync : sync_mod PORT MAP( clk => clk, basla => basla, y_sayac => y, x_sayac =>x , h_s => h_s ,
+                              v_s => v_s, video_on =>video );
+                              
+clock : clockdivider port map (clk => clk, reset => rst, clock_out => dividedclock);
+
+process(clk,reset)
+    begin
+        if clk'event and clk='1' then
+            if reset = '0' then
+                if score_checker1 = '1' then
+                    player1_score <= player1_score + '1';   
+               
+                elsif score_checker2 = '1' then
+                    player2_score <= player2_score + 1; 
+                end if;
+                
+                if player2_score > "1001" then 
+                    letterp <= "1010";
+                    winner <= "0010";
+                    player1_score <= "1111";
+                    player2_score <= "1111";   
+                    resetfunc <= '1';
+               end if;
+                if player1_score > "1001" and winner /= "0010" then -- 
+                    letterp <= "1010";
+                    winner <= "0001";
+                    player1_score <= "1111";
+                    player2_score <= "1111"; 
+                    resetfunc <= '1';
+                    
+                end if;
+                
+            elsif reset = '1' then
+                 player1_score <= "0000";
+                 player2_score <= "0000"; 
+                 letterp <= "0000";
+                 winner <= "0000";
+                 resetfunc <= '0';
+            end if;
+        
+        end if;
+end process;
+
+                              
+segment : sevensegment port map (clk => dividedclock, in0 => player2_score, in1 => winner , in2 => letterp, in3 => player1_score, a => a, b =>b, c=>c, d=>d, 
+                                 e=>e, f=>f, g=>g, dp=>dp, an => an);
+
+
+end Behavioral;
+
