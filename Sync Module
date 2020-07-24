@@ -1,0 +1,144 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
+
+
+entity sync_mod is
+    Port ( clk : in STD_LOGIC;
+           --reset : in STD_LOGIC;
+           basla : in STD_LOGIC;
+           y_sayac : out STD_LOGIC_VECTOR (9 downto 0);
+           x_sayac : out STD_LOGIC_VECTOR (9 downto 0);
+           h_s : out STD_LOGIC;
+           v_s : out STD_LOGIC;
+           video_on : out STD_LOGIC);
+end sync_mod;
+
+architecture Behavioral of sync_mod is
+
+constant HGO : integer:= 800;--Horizontal display
+constant HFP:integer:= 56;--Horizontal Front Porch
+constant HBP:integer:= 64;--Horizontal Back Porch
+constant HGK:integer:= 120;--Horizantal Pulse
+constant VGO:integer:=600;--Vertical Display
+constant VFP:integer:= 37;--Vertical Front Porch
+constant VBP:integer:= 23;--Vertical Back Porch
+constant VGK:integer:= 6;--Vertical Pulse
+--sync countera
+signal count_h,count_h_next: integer range 0 to 1039;
+signal count_v,count_v_next: integer range 0 to 665;
+--mod 2 counter
+signal sayac_mod2,sayac_mod2_next: std_logic:='0';
+--state signals
+signal h_end, v_end:std_logic:='0';
+--out signals(buffer)
+signal hs_buffer, hs_buffer_next:std_logic:='0';
+signal vs_buffer, vs_buffer_next:std_logic:='0';
+--pixel counters
+signal x_say, x_say_next:integer range 0 to 1100;
+signal y_say, y_say_next:integer range 0 to 1100;
+--video_on_of
+signal video:std_logic;
+begin
+
+--register
+   process(clk,basla)
+       begin
+
+         if clk'event and clk='1' and basla = '1' then
+              count_h<=count_h_next;
+              count_v<=count_v_next;
+               x_say<=x_say_next;
+               y_say<=y_say_next;
+               hs_buffer<=hs_buffer_next;
+               vs_buffer<=vs_buffer_next;
+               sayac_mod2<=sayac_mod2_next;
+        end if;
+end process;
+--video on/off
+       video <= '1' when  (count_v >= VBP) and (count_v < VBP + VGO) and (count_h >=HBP) and (count_h < HBP + HGO)
+                    else
+                         '0';
+
+--mod 2 counter
+       sayac_mod2_next<=not sayac_mod2;
+-- ending of the horizontal scan
+       h_end<= '1' when count_h=1039 else --(HGO+HFP+HBP+HGK-1)
+                         '0';
+-- ending of the vertical scan
+      v_end<= '1' when count_v=665 else --(VGO+VFP+VBP+VGK-1)
+                      '0'; 
+
+-- horizontal counter
+process(count_h,sayac_mod2,h_end)
+    begin
+       count_h_next<=count_h;
+       if  sayac_mod2= '1' then
+           if h_end='1' then
+               count_h_next<=0;
+           else
+               count_h_next<=count_h+1;
+          end if;
+     end if;
+  end process;
+
+-- vertical counter
+process(count_v,sayac_mod2,h_end,v_end)
+   begin        
+      count_v_next <= count_v;
+      if  sayac_mod2= '1' and h_end='1'  then
+         if v_end='1' then
+             count_v_next<=0;
+         else
+              count_v_next<=count_v+1;
+         end if;
+       end if;
+   end process;
+   
+--pixel x counter
+process(x_say,sayac_mod2,h_end,video)
+    begin       
+       x_say_next<=x_say;
+       if video = '1' then
+           if  sayac_mod2= '1' then                            
+               if x_say= 799 then
+                   x_say_next<=0;
+               else
+                  x_say_next<=x_say + 1;
+             end if;
+         end if;
+    else
+       x_say_next<=0;
+   end if;
+end process;
+
+--pixel y counter
+process(y_say,sayac_mod2,h_end,count_v)
+    begin        
+       y_say_next<=y_say;
+       if  sayac_mod2= '1' and h_end='1' then
+          if count_v > 22 and count_v < 622  then
+              y_say_next<=y_say + 1;
+         else
+             y_say_next<=0;                           
+         end if;
+     end if;
+end process;
+
+--buffer
+hs_buffer_next<= '1' when count_h < 918 else --(HBP+HGO+HFP)
+                                 '0';
+vs_buffer_next<='1' when count_v < 658 else --(VBP+VGO+VFP)
+                               '0';       
+
+ --outputs
+y_sayac <= conv_std_logic_vector(y_say,10);
+x_sayac <= conv_std_logic_vector(x_say,10);
+h_s<= hs_buffer;
+v_s<= vs_buffer;
+video_on<=video;
+
+end Behavioral;
